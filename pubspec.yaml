@@ -11,6 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   ffi: ^1.1.2
+  charset_converter:
 dev_dependencies:
   flutter_test:
     sdk: flutter

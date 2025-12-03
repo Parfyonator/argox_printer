@@ -6,7 +6,9 @@
 
 import 'dart:io';
 import 'dart:ffi' as ffi;
+import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
+import 'package:charset_converter/charset_converter.dart';
 
 /// Error handling
 class ArgoxException implements Exception {
@@ -1088,7 +1090,39 @@ class ArgoxPPLA extends ArgoxLibrary {
   ///    A_Prn_Text(310, 35, 1, 9, 0, 1, 1, 'N', 2, "PPLA COMMAND");
   ///
   ///REMARK  The A_Prn_Text function can print a line text.
-  int A_Prn_Text(
+  // int A_Prn_Text(
+  //   int x,
+  //   int y,
+  //   int ori,
+  //   int font,
+  //   int type,
+  //   int hor_factor,
+  //   int ver_factor,
+  //   String mode,
+  //   int numeric,
+  //   String data,
+  // ) {
+  //   assert(hor_factor >= 1 && hor_factor <= 24,
+  //       'hor_factor must be between 1 and 24');
+  //   assert(ver_factor >= 1 && ver_factor <= 24,
+  //       'ver_factor must be between 1 and 24');
+  //   assert(['A', 'B', 'C', 'D', 'M', 'N'].contains(mode),
+  //       'Only allowed mode values: A, B, C, D, M, N.');
+  //   return _A_Prn_Text(
+  //     x,
+  //     y,
+  //     ori,
+  //     font,
+  //     type,
+  //     hor_factor,
+  //     ver_factor,
+  //     mode.codeUnitAt(0),
+  //     numeric,
+  //     data.toNativeUtf8().cast<ffi.Int8>(),
+  //   );
+  // }
+
+  Future<int> A_Prn_Text(
     int x,
     int y,
     int ori,
@@ -1099,25 +1133,34 @@ class ArgoxPPLA extends ArgoxLibrary {
     String mode,
     int numeric,
     String data,
-  ) {
-    assert(hor_factor >= 1 && hor_factor <= 24,
-        'hor_factor must be between 1 and 24');
-    assert(ver_factor >= 1 && ver_factor <= 24,
-        'ver_factor must be between 1 and 24');
-    assert(['A', 'B', 'C', 'D', 'M', 'N'].contains(mode),
-        'Only allowed mode values: A, B, C, D, M, N.');
-    return _A_Prn_Text(
-      x,
-      y,
-      ori,
-      font,
-      type,
-      hor_factor,
-      ver_factor,
-      mode.codeUnitAt(0),
-      numeric,
-      data.toNativeUtf8().cast<ffi.Int8>(),
-    );
+  ) async {
+    // Encode as CP1251 bytes
+    final Uint8List? cp1251Bytes = await CharsetConverter.encode("windows-1251", data);
+    if (cp1251Bytes == null) return -1; // error
+    
+    // Allocate native memory and copy bytes
+    final ffi.Pointer<ffi.Uint8> nativeBytes = malloc.allocate<ffi.Uint8>(cp1251Bytes.length + 1);
+    for (int i = 0; i < cp1251Bytes.length; i++) {
+      nativeBytes[i] = cp1251Bytes[i];
+    }
+    nativeBytes[cp1251Bytes.length] = 0; // null terminator
+    
+    try {
+      return _A_Prn_Text(
+        x,
+        y,
+        ori,
+        font,
+        type,
+        hor_factor,
+        ver_factor,
+        mode.codeUnitAt(0),
+        numeric,
+        nativeBytes.cast<ffi.Int8>(),
+      );
+    } finally {
+      malloc.free(nativeBytes); // free memory
+    }
   }
 
   late final _A_Prn_TextPtr = _lookup<
