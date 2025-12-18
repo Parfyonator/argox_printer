@@ -6,7 +6,9 @@
 
 import 'dart:io';
 import 'dart:ffi' as ffi;
+import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
+import 'package:charset_converter/charset_converter.dart';
 
 /// Error handling
 class ArgoxException implements Exception {
@@ -1098,7 +1100,7 @@ class ArgoxPPLA extends ArgoxLibrary {
     int ver_factor,
     String mode,
     int numeric,
-    String data,
+    Uint8List data,
   ) {
     assert(hor_factor >= 1 && hor_factor <= 24,
         'hor_factor must be between 1 and 24');
@@ -1106,18 +1108,30 @@ class ArgoxPPLA extends ArgoxLibrary {
         'ver_factor must be between 1 and 24');
     assert(['A', 'B', 'C', 'D', 'M', 'N'].contains(mode),
         'Only allowed mode values: A, B, C, D, M, N.');
-    return _A_Prn_Text(
-      x,
-      y,
-      ori,
-      font,
-      type,
-      hor_factor,
-      ver_factor,
-      mode.codeUnitAt(0),
-      numeric,
-      data.toNativeUtf8().cast<ffi.Int8>(),
-    );
+
+    // Allocate native memory and copy bytes
+    final ffi.Pointer<ffi.Uint8> nativeBytes = malloc.allocate<ffi.Uint8>(data.length + 1);
+    for (int i = 0; i < data.length; i++) {
+      nativeBytes[i] = data[i];
+    }
+    nativeBytes[data.length] = 0; // null terminator
+
+    try{
+      return _A_Prn_Text(
+        x,
+        y,
+        ori,
+        font,
+        type,
+        hor_factor,
+        ver_factor,
+        mode.codeUnitAt(0),
+        numeric,
+        nativeBytes.cast<ffi.Int8>(),
+      );
+    } finally {
+       malloc.free(nativeBytes);
+    }
   }
 
   late final _A_Prn_TextPtr = _lookup<

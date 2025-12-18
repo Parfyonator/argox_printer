@@ -47,7 +47,6 @@ app.*.symbols
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 
 # FVM
-.fvm/flutter_sdk
 
 # Android related
 **/android/gradlew
@@ -102,3 +101,6 @@ app.*.symbols
 **/web/firebase_options.dart
 
 test/output.log
+
+# FVM Version Cache
+.fvm/
