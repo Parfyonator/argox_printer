@@ -1647,7 +1647,14 @@ class ArgoxPPLA extends ArgoxLibrary {
       _A_GetUSBBufferLenPtr.asFunction<int Function()>();
 
   String A_EnumUSB() {
-    final pbuf = calloc<ffi.Int8>(128);
+    // Get the required buffer size first
+    final bufferLen = A_GetUSBBufferLen();
+    if (bufferLen <= 0) {
+      throw ArgoxException(4001); // No USB Printer Connect
+    }
+
+    // Allocate buffer with enough space
+    final pbuf = calloc<ffi.Int8>(bufferLen + 1);
     final result = _A_EnumUSB(
       pbuf,
     );
@@ -2010,20 +2017,51 @@ class ArgoxPPLA extends ArgoxLibrary {
           int Function(int, int, int, ffi.Pointer<ffi.Int8>, int, int, int, int,
               int, ffi.Pointer<ffi.Int8>, ffi.Pointer<ffi.Int8>, int, int)>();
 
-  int A_GetUSBDeviceInfo(
-    int nPort,
-    String pDeviceName,
-    int pDeviceNameLen,
-    String pDevicePath,
-    int pDevicePathLen,
-  ) {
-    return _A_GetUSBDeviceInfo(
-      nPort,
-      pDeviceName.toNativeUtf8().cast<ffi.Int8>(),
-      pDeviceNameLen.toString().toNativeUtf8().cast<ffi.Int32>(),
-      pDevicePath.toNativeUtf8().cast<ffi.Int8>(),
-      pDevicePathLen.toString().toNativeUtf8().cast<ffi.Int32>(),
-    );
+  /// Get USB device information by port index
+  ///
+  /// Returns a Map with 'deviceName' and 'devicePath' keys
+  ///
+  /// Example:
+  /// ```dart
+  /// final info = printer.A_GetUSBDeviceInfo(1);
+  /// print('Device: ${info['deviceName']}');
+  /// print('Path: ${info['devicePath']}');
+  /// ```
+  Map<String, String> A_GetUSBDeviceInfo(int nPort) {
+    const int maxNameLen = 256;
+    const int maxPathLen = 512;
+
+    final pDeviceName = calloc<ffi.Int8>(maxNameLen);
+    final pDeviceNameLen = calloc<ffi.Int32>();
+    pDeviceNameLen.value = maxNameLen;
+
+    final pDevicePath = calloc<ffi.Int8>(maxPathLen);
+    final pDevicePathLen = calloc<ffi.Int32>();
+    pDevicePathLen.value = maxPathLen;
+
+    try {
+      final result = _A_GetUSBDeviceInfo(
+        nPort,
+        pDeviceName,
+        pDeviceNameLen,
+        pDevicePath,
+        pDevicePathLen,
+      );
+
+      if (result != 0) {
+        throw ArgoxException(result);
+      }
+
+      return {
+        'deviceName': pDeviceName.cast<Utf8>().toDartString(),
+        'devicePath': pDevicePath.cast<Utf8>().toDartString(),
+      };
+    } finally {
+      calloc.free(pDeviceName);
+      calloc.free(pDeviceNameLen);
+      calloc.free(pDevicePath);
+      calloc.free(pDevicePathLen);
+    }
   }
 
   late final _A_GetUSBDeviceInfoPtr = _lookup<
