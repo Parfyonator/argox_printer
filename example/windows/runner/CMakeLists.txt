@@ -17,10 +17,11 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 add_dependencies(${BINARY_NAME} flutter_assemble)
 
 # Copy Argox printer DLLs to the executable directory (for Debug builds)
+# The DLL is in the parent package's windows folder: argox_printer/windows/
 add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E echo "Copying Argox DLLs for Debug build..."
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../windows/Winppla.dll"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../windows/Winppla.dll"
     "$<TARGET_FILE_DIR:${BINARY_NAME}>"
   COMMAND ${CMAKE_COMMAND} -E echo "Argox DLLs copied to $<TARGET_FILE_DIR:${BINARY_NAME}>"
   VERBATIM
