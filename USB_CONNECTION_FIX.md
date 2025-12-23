@@ -109,14 +109,15 @@ The library provides **multiple ways** to connect via USB, which wasn't document
 
 ## How to Use USB Connections (Fixed)
 
-### Method 1: Simple Connection by Index (Recommended)
+### Method 1: A_CreatePort - Direct USB (RECOMMENDED - PROVEN WORKING)
 
 ```dart
 final printer = ArgoxPPLA();
 
 try {
-  // Connect to first USB printer
-  printer.A_CreateUSBPort(1);  // Index starts from 1
+  // Connect to USB printer by index
+  // nPortType = 11 for USB by index, nPort = printer index (1, 2, 3...)
+  printer.A_CreatePort(11, 1, '');  // Connect to first USB printer
 
   // Print something
   printer.A_Set_Unit('m');
@@ -131,7 +132,25 @@ try {
 }
 ```
 
-### Method 2: Enumerate First, Then Connect
+### Method 2: Windows Printer Name (MOST RELIABLE - PROVEN WORKING)
+
+```dart
+final printer = ArgoxPPLA();
+
+try {
+  // Connect using Windows printer name
+  // Find your printer name with: Get-Printer | Select-Object Name
+  printer.A_CreatePrn(0, 'Argox iX4-250 PPLA');
+
+  // ... your printing code ...
+
+  printer.A_ClosePrn();
+} catch (e) {
+  print('Error: $e');
+}
+```
+
+### Method 3: Enumerate First, Then Connect (May Not Work)
 
 ```dart
 final printer = ArgoxPPLA();

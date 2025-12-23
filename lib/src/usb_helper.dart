@@ -29,7 +29,10 @@ class ArgoxUsbHelper {
     final devices = <UsbDeviceInfo>[];
 
     // Try Method 1: A_GetUSBDeviceInfo (if DLL supports it)
+    // Note: A_GetUSBBufferLen might return 0 in FFI even when printer is connected
+    // Try direct device info query as workaround
     try {
+      // First, try the documented approach with A_GetUSBBufferLen
       int bufferLen = _printer.A_GetUSBBufferLen();
       if (bufferLen > 0) {
         String usbList = _printer.A_EnumUSB();
@@ -56,7 +59,33 @@ class ArgoxUsbHelper {
         if (devices.isNotEmpty) return devices;
       }
     } catch (_) {
-      // A_GetUSBDeviceInfo not available, try Windows query
+      // A_GetUSBBufferLen failed, try alternative
+    }
+
+    // Method 1b: Try A_GetUSBDeviceInfo directly (FFI workaround)
+    // Even if A_GetUSBBufferLen returns 0, A_GetUSBDeviceInfo might work
+    if (devices.isEmpty) {
+      try {
+        for (int i = 1; i <= 5; i++) {
+          try {
+            Map<String, String> info = _printer.A_GetUSBDeviceInfo(i);
+            if (info['devicePath']?.isNotEmpty == true) {
+              devices.add(UsbDeviceInfo(
+                name: info['deviceName'] ?? 'Unknown',
+                path: info['devicePath']!,
+                index: i,
+              ));
+            }
+          } catch (_) {
+            // No more devices at this index
+            break;
+          }
+        }
+
+        if (devices.isNotEmpty) return devices;
+      } catch (_) {
+        // A_GetUSBDeviceInfo also not available
+      }
     }
 
     // Try Method 2: Query Windows via PowerShell/WMI
@@ -70,18 +99,33 @@ class ArgoxUsbHelper {
           # USB Printing Support interface GUID (Windows constant)
           $usbPrintGuid = "{a5dcbf10-6530-11d2-901f-00c04fb951ed}"
 
+          # Find Argox printers - check both Printer and USB classes
           $devices = Get-PnpDevice | Where-Object {
-            $_.Class -eq 'USB' -and $_.FriendlyName -like '*Argox*'
+            $_.FriendlyName -like '*Argox*' -and
+            ($_.Class -eq 'Printer' -or $_.Class -eq 'USB')
           }
 
           foreach ($device in $devices) {
             $deviceId = $device.InstanceId
 
-            # Convert PnP Instance ID to device path format
-            # Format: \\?\USB#VID_XXXX&PID_XXXX#SERIAL#GUID
-            $devicePath = "\\?\$($deviceId.Replace('\', '#'))#$usbPrintGuid"
+            # For USBPRINT devices, we need to get the USB parent device
+            if ($deviceId -like 'USBPRINT*') {
+              # Get the USB parent device which has the actual VID/PID
+              $usbParent = Get-PnpDevice | Where-Object {
+                $_.InstanceId -like 'USB\VID_1664*' -and
+                $_.FriendlyName -like '*USB Printing Support*'
+              }
 
-            Write-Output "$($device.FriendlyName)|$devicePath"
+              if ($usbParent) {
+                $usbId = $usbParent.InstanceId
+                $devicePath = "\\?\$($usbId.Replace('\', '#'))#$usbPrintGuid"
+                Write-Output "$($device.FriendlyName)|$devicePath"
+              }
+            } elseif ($deviceId -like 'USB*') {
+              # Direct USB device
+              $devicePath = "\\?\$($deviceId.Replace('\', '#'))#$usbPrintGuid"
+              Write-Output "$($device.FriendlyName)|$devicePath"
+            }
           }
           ''',
         ],
