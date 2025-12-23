@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:argox_printer/argox_printer.dart';
 
@@ -71,7 +72,8 @@ class _MyAppState extends State<MyApp> {
       _printer!.A_Set_DebugDialog(1);
       _printer!.A_Set_Unit('m');
       _printer!.A_Clear_Memory();
-      _printer!.A_Prn_Text(10, 10, 1, 2, 0, 1, 1, 'N', 2, 'Lorem ipsum');
+      _printer!.A_Prn_Text(10, 10, 1, 2, 0, 1, 1, 'N', 2,
+          Uint8List.fromList('Lorem ipsum'.codeUnits));
       _printer!.A_Prn_Barcode(10, 40, 1, 'A', 0, 0, 20, 'B', 1, '1234');
       _printer!.A_Print_Out(1, 1, 2, 1);
       _printer!.A_ClosePrn();
