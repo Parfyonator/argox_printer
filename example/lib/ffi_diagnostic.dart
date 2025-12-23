@@ -3,8 +3,16 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:argox_printer/argox_printer.dart';
 
-/// Deep FFI diagnostic to understand why A_GetUSBBufferLen returns 0 in Dart
-/// but works in C/C++
+/// FFI Diagnostic Tool
+///
+/// This tool is for debugging FFI calling convention issues.
+/// See USB_FFI_ISSUE.md for details about the known FFI limitation.
+///
+/// Normal users should use the USB helper instead:
+///   bool connected = await printer.usb.autoConnect();
+///
+/// This diagnostic shows that A_GetUSBBufferLen returns 0 due to
+/// calling convention mismatch between DLL (__cdecl) and Dart FFI (__stdcall).
 void main() {
   print('=== FFI Diagnostic for A_GetUSBBufferLen ===\n');
 

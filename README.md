@@ -103,31 +103,68 @@ void main() async {
 }
 ```
 
-### USB Printer Detection
+### USB Printer Auto-Detection (Recommended)
+
+The package includes a USB helper that automatically detects and connects to USB printers:
 
 ```dart
-void detectUSBPrinters() {
+import 'dart:typed_data';
+import 'package:argox_printer/argox_printer.dart';
+
+void main() async {
   final printer = ArgoxPPLA();
-  
-  try {
-    // Check for USB printers
-    int bufferLen = printer.A_GetUSBBufferLen();
-    
-    if (bufferLen > 0) {
-      String usbData = printer.A_EnumUSB();
-      print('USB Printers found: $usbData');
-      
-      // Connect to first USB printer
-      printer.A_CreateUSBPort(1);
-      print('Connected to USB printer');
-    } else {
-      print('No USB printers detected');
-    }
-  } catch (e) {
-    print('USB detection failed: $e');
+
+  // Automatic detection and connection (easiest method)
+  bool connected = await printer.usb.autoConnect();
+
+  if (connected) {
+    print('✓ Connected to USB printer');
+
+    // Print your label
+    printer.A_Set_Unit('m');
+    printer.A_Clear_Memory();
+    printer.A_Prn_Text(10, 10, 1, 2, 0, 1, 1, 'N', 0,
+      Uint8List.fromList('Hello USB!'.codeUnits));
+    printer.A_Print_Out(1, 1, 1, 1);
+    printer.A_ClosePrn();
+  } else {
+    print('✗ No USB printer found');
   }
 }
 ```
+
+### USB Printer Manual Selection
+
+List and select from available USB printers:
+
+```dart
+void selectUSBPrinter() async {
+  final printer = ArgoxPPLA();
+
+  // Get list of available USB printers
+  List<UsbDeviceInfo> devices = await printer.usb.getUsbPrinters();
+
+  if (devices.isEmpty) {
+    print('No USB printers found');
+    return;
+  }
+
+  print('Available USB printers:');
+  for (var device in devices) {
+    print('  ${device.index}. ${device.name}');
+    print('     Path: ${device.path}');
+  }
+
+  // Connect to first printer
+  if (printer.usb.connectByDevicePath(devices.first.path)) {
+    print('Connected to: ${devices.first.name}');
+    // ... print your label ...
+    printer.A_ClosePrn();
+  }
+}
+```
+
+**Note:** The USB helper automatically handles DLL enumeration limitations and uses Windows WMI queries as a fallback for reliable printer detection. See [USB_FFI_ISSUE.md](USB_FFI_ISSUE.md) for technical details.
 
 ### Advanced Example: Label with QR Code
 
