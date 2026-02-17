@@ -928,7 +928,7 @@ class ArgoxPPLA extends ArgoxLibrary {
     int height,
     String mode,
     int numeric,
-    String data,
+    Uint8List data,
   ) {
     List<String> types = [
       'A',
@@ -978,18 +978,30 @@ class ArgoxPPLA extends ArgoxLibrary {
     assert(height >= 0 && height <= 999, 'height must be between 0 and 999.');
     assert(['A', 'B', 'C', 'D', 'N'].contains(mode), 'Invalid mode!');
     assert(numeric >= 0 && numeric <= 99, 'numeric must be between 0 and 99.');
-    return _A_Prn_Barcode(
-      x,
-      y,
-      ori,
-      type.codeUnitAt(0),
-      narrow,
-      width,
-      height,
-      mode.codeUnitAt(0),
-      numeric,
-      data.toNativeUtf8().cast<ffi.Int8>(),
-    );
+
+    // Allocate native memory and copy bytes
+    final ffi.Pointer<ffi.Uint8> nativeBytes = malloc.allocate<ffi.Uint8>(data.length + 1);
+    for (int i = 0; i < data.length; i++) {
+      nativeBytes[i] = data[i];
+    }
+    nativeBytes[data.length] = 0; // null terminator
+
+    try {
+      return _A_Prn_Barcode(
+        x,
+        y,
+        ori,
+        type.codeUnitAt(0),
+        narrow,
+        width,
+        height,
+        mode.codeUnitAt(0),
+        numeric,
+        nativeBytes.cast<ffi.Int8>(),
+      );
+    } finally {
+      malloc.free(nativeBytes);
+    }
   }
 
   late final _A_Prn_BarcodePtr = _lookup<
