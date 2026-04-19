@@ -928,7 +928,7 @@ class ArgoxPPLA extends ArgoxLibrary {
     int height,
     String mode,
     int numeric,
-    String data,
+    Uint8List data,
   ) {
     List<String> types = [
       'A',
@@ -978,18 +978,30 @@ class ArgoxPPLA extends ArgoxLibrary {
     assert(height >= 0 && height <= 999, 'height must be between 0 and 999.');
     assert(['A', 'B', 'C', 'D', 'N'].contains(mode), 'Invalid mode!');
     assert(numeric >= 0 && numeric <= 99, 'numeric must be between 0 and 99.');
-    return _A_Prn_Barcode(
-      x,
-      y,
-      ori,
-      type.codeUnitAt(0),
-      narrow,
-      width,
-      height,
-      mode.codeUnitAt(0),
-      numeric,
-      data.toNativeUtf8().cast<ffi.Int8>(),
-    );
+
+    // Allocate native memory and copy bytes
+    final ffi.Pointer<ffi.Uint8> nativeBytes = malloc.allocate<ffi.Uint8>(data.length + 1);
+    for (int i = 0; i < data.length; i++) {
+      nativeBytes[i] = data[i];
+    }
+    nativeBytes[data.length] = 0; // null terminator
+
+    try {
+      return _A_Prn_Barcode(
+        x,
+        y,
+        ori,
+        type.codeUnitAt(0),
+        narrow,
+        width,
+        height,
+        mode.codeUnitAt(0),
+        numeric,
+        nativeBytes.cast<ffi.Int8>(),
+      );
+    } finally {
+      malloc.free(nativeBytes);
+    }
   }
 
   late final _A_Prn_BarcodePtr = _lookup<
@@ -1647,7 +1659,14 @@ class ArgoxPPLA extends ArgoxLibrary {
       _A_GetUSBBufferLenPtr.asFunction<int Function()>();
 
   String A_EnumUSB() {
-    final pbuf = calloc<ffi.Int8>(128);
+    // Get the required buffer size first
+    final bufferLen = A_GetUSBBufferLen();
+    if (bufferLen <= 0) {
+      throw ArgoxException(4001); // No USB Printer Connect
+    }
+
+    // Allocate buffer with enough space
+    final pbuf = calloc<ffi.Int8>(bufferLen + 1);
     final result = _A_EnumUSB(
       pbuf,
     );
@@ -2010,20 +2029,51 @@ class ArgoxPPLA extends ArgoxLibrary {
           int Function(int, int, int, ffi.Pointer<ffi.Int8>, int, int, int, int,
               int, ffi.Pointer<ffi.Int8>, ffi.Pointer<ffi.Int8>, int, int)>();
 
-  int A_GetUSBDeviceInfo(
-    int nPort,
-    String pDeviceName,
-    int pDeviceNameLen,
-    String pDevicePath,
-    int pDevicePathLen,
-  ) {
-    return _A_GetUSBDeviceInfo(
-      nPort,
-      pDeviceName.toNativeUtf8().cast<ffi.Int8>(),
-      pDeviceNameLen.toString().toNativeUtf8().cast<ffi.Int32>(),
-      pDevicePath.toNativeUtf8().cast<ffi.Int8>(),
-      pDevicePathLen.toString().toNativeUtf8().cast<ffi.Int32>(),
-    );
+  /// Get USB device information by port index
+  ///
+  /// Returns a Map with 'deviceName' and 'devicePath' keys
+  ///
+  /// Example:
+  /// ```dart
+  /// final info = printer.A_GetUSBDeviceInfo(1);
+  /// print('Device: ${info['deviceName']}');
+  /// print('Path: ${info['devicePath']}');
+  /// ```
+  Map<String, String> A_GetUSBDeviceInfo(int nPort) {
+    const int maxNameLen = 256;
+    const int maxPathLen = 512;
+
+    final pDeviceName = calloc<ffi.Int8>(maxNameLen);
+    final pDeviceNameLen = calloc<ffi.Int32>();
+    pDeviceNameLen.value = maxNameLen;
+
+    final pDevicePath = calloc<ffi.Int8>(maxPathLen);
+    final pDevicePathLen = calloc<ffi.Int32>();
+    pDevicePathLen.value = maxPathLen;
+
+    try {
+      final result = _A_GetUSBDeviceInfo(
+        nPort,
+        pDeviceName,
+        pDeviceNameLen,
+        pDevicePath,
+        pDevicePathLen,
+      );
+
+      if (result != 0) {
+        throw ArgoxException(result);
+      }
+
+      return {
+        'deviceName': pDeviceName.cast<Utf8>().toDartString(),
+        'devicePath': pDevicePath.cast<Utf8>().toDartString(),
+      };
+    } finally {
+      calloc.free(pDeviceName);
+      calloc.free(pDeviceNameLen);
+      calloc.free(pDevicePath);
+      calloc.free(pDevicePathLen);
+    }
   }
 
   late final _A_GetUSBDeviceInfoPtr = _lookup<

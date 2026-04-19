@@ -1,6 +1,7 @@
 import 'package:test/test.dart';
 import 'package:argox_printer/argox_printer.dart';
 import 'dart:io';
+import 'dart:typed_data';
 
 void main() {
   group('Argox Printer Tests', () {
@@ -41,7 +42,9 @@ void main() {
 
         lib.A_Clear_Memory();
 
-        expect(lib.A_Prn_Text(10, 10, 1, 2, 0, 1, 1, 'N', 2, 'Lorem ipsum'),
+        expect(
+            lib.A_Prn_Text(10, 10, 1, 2, 0, 1, 1, 'N', 2,
+                Uint8List.fromList('Lorem ipsum'.codeUnits)),
             equals(0));
         expect(lib.A_Prn_Barcode(10, 40, 1, 'A', 0, 0, 20, 'B', 1, '1234'),
             equals(0));
@@ -65,7 +68,9 @@ void main() {
       try {
         final lib = ArgoxPPLA();
         // Test with invalid parameters to ensure proper error handling
-        expect(() => lib.A_Prn_Text(-1, -1, 0, 0, 0, 0, 0, '', 0, ''),
+        expect(
+            () => lib.A_Prn_Text(-1, -1, 0, 0, 0, 0, 0, '', 0,
+                Uint8List.fromList(''.codeUnits)),
             returnsNormally);
       } catch (e) {
         // DLL not available, test passes (expected on non-Windows)
